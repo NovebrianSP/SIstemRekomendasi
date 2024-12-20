@@ -1,11 +1,7 @@
-import os
 import pandas as pd
 from flask import Flask, request, render_template
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import jaccard_score
-from sklearn.preprocessing import MultiLabelBinarizer
 
 # Load the dataset
 file_path = 'E:/DATA/PythonProgram/SR/destinasi-wisata-indonesia.xlsx'
@@ -33,10 +29,18 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 model = DecisionTreeClassifier(random_state=42)
 model.fit(X_train, y_train)
 
-# Preprocess text for description similarity using Jaccard Similarity
+# Preprocess text for description similarity
 def preprocess_text(text):
-    """Preprocess text by tokenizing and lowercasing."""
-    return set(text.lower().split())
+    """Preprocess text by tokenizing, lowercasing, and removing common stopwords."""
+    from nltk.corpus import stopwords
+    from nltk.stem import PorterStemmer
+
+    stop_words = set(stopwords.words('indonesian'))  # Stopwords for Indonesian
+    stemmer = PorterStemmer()
+
+    tokens = text.lower().split()
+    tokens = [stemmer.stem(word) for word in tokens if word not in stop_words]
+    return set(tokens)
 
 # Flask app setup
 app = Flask(__name__)
@@ -64,84 +68,26 @@ def recommend():
     # Compute description similarity using Jaccard Similarity
     user_desc_set = preprocess_text(description)
 
-    def calculate_jaccard_similarity(row):
+    def calculate_combined_similarity(row):
         row_desc_set = preprocess_text(row['Description'])
-        intersection = len(user_desc_set & row_desc_set)
-        union = len(user_desc_set | row_desc_set)
-        return intersection / union if union != 0 else 0
+        desc_similarity = len(user_desc_set & row_desc_set) / len(user_desc_set | row_desc_set) if len(user_desc_set | row_desc_set) != 0 else 0
+        category_similarity = 1 if row['Category'] == category else 0
+        return 0.8 * desc_similarity + 0.2 * category_similarity
 
-    filtered_df['Similarity'] = filtered_df.apply(calculate_jaccard_similarity, axis=1)
+    filtered_df['Similarity'] = filtered_df.apply(calculate_combined_similarity, axis=1)
 
-    # Sort recommendations by Similarity and Rating in descending order
-    sorted_df = filtered_df.sort_values(by=['Similarity', 'Rating'], ascending=[False, False])
-    recommendations = sorted_df[['Place_Name', 'Price', 'Rating', 'Similarity']].to_dict(orient='records')
+    # Compute final score by combining similarity, rating, and price
+    filtered_df['Final_Score'] = (
+        0.7 * filtered_df['Similarity'] + 
+        0.2 * (filtered_df['Rating'] / 5) + 
+        0.1 * (1 - filtered_df['Price'] / filtered_df['Price'].max())
+    )
+
+    # Sort recommendations by Final_Score
+    sorted_df = filtered_df.sort_values(by='Final_Score', ascending=False)
+    recommendations = sorted_df[['Place_Name', 'Price', 'Rating', 'Similarity', 'Final_Score']].to_dict(orient='records')
 
     return render_template('result.html', recommendations=recommendations)
 
 if __name__ == '__main__':
-    # Ensure templates folder exists for Flask
-    os.makedirs('templates', exist_ok=True)
-
-    # Create templates for the app
-    with open(os.path.join('templates', 'index.html'), 'w') as f:
-        f.write('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Travel Recommendations</title>
-        </head>
-        <body>
-            <h1>Travel Recommendation System</h1>
-            <form action="/recommend" method="post">
-                <label for="city">Select City:</label>
-                <select name="city" id="city">
-                    {% for city in cities %}
-                    <option value="{{ city }}">{{ city }}</option>
-                    {% endfor %}
-                </select>
-                <br>
-                <label for="category">Select Category:</label>
-                <select name="category" id="category">
-                    {% for category in categories %}
-                    <option value="{{ category }}">{{ category }}</option>
-                    {% endfor %}
-                </select>
-                <br>
-                <label for="price">Maximum Price:</label>
-                <input type="number" name="price" id="price" step="0.01">
-                <br>
-                <label for="description">Describe Your Preference:</label>
-                <textarea name="description" id="description" rows="4" cols="50"></textarea>
-                <br>
-                <button type="submit">Get Recommendations</button>
-            </form>
-        </body>
-        </html>
-        ''')
-
-    with open(os.path.join('templates', 'result.html'), 'w') as f:
-        f.write('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Recommendations</title>
-        </head>
-        <body>
-            <h1>Recommendations</h1>
-            {% if recommendations %}
-                <ul>
-                    {% for recommendation in recommendations %}
-                    <li>
-                        {{ recommendation.Place_Name }} - Price: {{ recommendation.Price }} - Rating: {{ recommendation.Rating }} - Similarity: {{ recommendation.Similarity|round(2) }}
-                    </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>No recommendations found for the selected criteria.</p>
-            {% endif %}
-            <a href="/">Back to Home</a>
-        </body>
-        </html>
-        ''')
-
     app.run(debug=True)
