@@ -1,0 +1,23 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Recommendations</title>
+        </head>
+        <body>
+            <h1>Recommendations</h1>
+            {% if recommendations %}
+                <ul>
+                    {% for recommendation in recommendations %}
+                    <li>
+                        {{ recommendation.Place_Name }} - Price: {{ recommendation.Price }} - Rating: {{ recommendation.Rating }} - Similarity: {{ recommendation.Similarity|round(2) }}
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No recommendations found for the selected criteria.</p>
+            {% endif %}
+            <a href="/">Back to Home</a>
+        </body>
+        </html>
+        

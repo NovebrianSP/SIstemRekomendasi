@@ -1,0 +1,34 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Travel Recommendations</title>
+        </head>
+        <body>
+            <h1>Travel Recommendation System</h1>
+            <form action="/recommend" method="post">
+                <label for="city">Select City:</label>
+                <select name="city" id="city">
+                    {% for city in cities %}
+                    <option value="{{ city }}">{{ city }}</option>
+                    {% endfor %}
+                </select>
+                <br>
+                <label for="category">Select Category:</label>
+                <select name="category" id="category">
+                    {% for category in categories %}
+                    <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+                <br>
+                <label for="price">Maximum Price:</label>
+                <input type="number" name="price" id="price" step="0.01">
+                <br>
+                <label for="description">Describe Your Preference:</label>
+                <textarea name="description" id="description" rows="4" cols="50"></textarea>
+                <br>
+                <button type="submit">Get Recommendations</button>
+            </form>
+        </body>
+        </html>
+        
