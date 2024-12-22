@@ -21,11 +21,14 @@
         <table class="table table-bordered table-hover">
           <thead class="table-success">
             <tr>
-              <th>Index</th>
+              <th>#</th>
               <th>Place Name</th>
+              <th>Category</th>
               <th>Price</th>
+              <th>Description Similarity</th>
+              <th>Price Similarity</th>
               <th>Rating</th>
-              <th>Similarity</th>
+              <th>Final Score</th>
             </tr>
           </thead>
           <tbody>
@@ -33,9 +36,30 @@
             <tr>
               <td>{{ loop.index }}</td>
               <td>{{ recommendation.Place_Name }}</td>
-              <td>Rp {{ recommendation.Price|int }}</td>
-              <td>{{ recommendation.Rating }}</td>
-              <td>{{ recommendation.Similarity|round(2) }}</td>
+              <td>{{ recommendation.Category }}</td>
+              <td>Rp {{ recommendation.Price | int }}</td>
+              <td>
+                {% if recommendation.Description_Similarity is not none %}
+                  {{ recommendation.Description_Similarity | round(2) }}
+                {% else %}
+                  N/A
+                {% endif %}
+              </td>
+              <td>
+                {% if recommendation.Price_Similarity is not none %}
+                  {{ recommendation.Price_Similarity | round(2) }}
+                {% else %}
+                  N/A
+                {% endif %}
+              </td>
+              <td>
+                {% if recommendation.Normalized_Rating is not none %}
+                  {{ recommendation.Normalized_Rating | round(2) }}
+                {% else %}
+                  N/A
+                {% endif %}
+              </td>
+              <td>{{ recommendation.Final_Score | round(2) }}</td>
             </tr>
             {% endfor %}
           </tbody>

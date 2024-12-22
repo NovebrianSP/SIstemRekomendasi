@@ -22,29 +22,17 @@
       <div class="card">
         <div class="card-body">
           <form action="/recommend" method="post">
-            <div class="form-container">
+            <div class="form-container mb-3">
               <label class="form-label" for="city">Select City:</label>
-              <select class="form-select" name="city" id="city">
+              <select class="form-select" name="city" id="city" required>
                 {% for city in cities %}
                 <option value="{{ city }}">{{ city }}</option>
                 {% endfor %}
               </select>
-              <span class="title"></span>
-              <i class=""></i>
             </div>
 
-            <div class="form-container">
-              <label class="form-label" for="category">Select Category:</label>
-              <select class="form-select" name="category" id="category">
-                {% for category in categories %}
-                <option value="{{ category }}">{{ category }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="form-container">
+            <div class="form-container mb-3">
               <label class="form-label" for="price">Maximum Price:</label>
-
               <div class="input-group">
                 <span class="input-group-text">Rp</span>
                 <input
@@ -52,15 +40,16 @@
                   type="number"
                   name="price"
                   id="price"
-                  step="1000"
+                  step="5000"
                   min="0"
                   value="0"
                   placeholder="Define your budget"
+                  required
                 />
               </div>
             </div>
 
-            <div class="form-container">
+            <div class="form-container mb-3">
               <label class="form-label" for="description"
                 >Describe Your Preference:</label
               >
@@ -70,10 +59,12 @@
                 id="description"
                 rows="4"
                 cols="50"
+                placeholder="Describe what you are looking for in a travel destination"
+                required
               ></textarea>
             </div>
 
-            <button class="btn btn-slide" type="submit">
+            <button class="btn btn-slide w-100" type="submit">
               Get Recommendations
             </button>
           </form>

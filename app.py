@@ -1,93 +1,90 @@
+from flask import Flask, render_template, request
 import pandas as pd
-from flask import Flask, request, render_template
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.model_selection import train_test_split
+import re
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+from sklearn.metrics.pairwise import euclidean_distances
 
-# Load the dataset
-file_path = 'E:/DATA/PythonProgram/SR/destinasi-wisata-indonesia.xlsx'
-data = pd.ExcelFile(file_path)
-df = data.parse('Worksheet')
-
-# Select relevant features
-selected_features = df[['Place_Name', 'Category', 'City', 'Price', 'Rating', 'Time_Minutes', 'Description']]
-
-# Handle missing values
-selected_features['Time_Minutes'].fillna(selected_features['Time_Minutes'].median(), inplace=True)
-selected_features['Description'].fillna("", inplace=True)
-
-# Encode categorical variables
-encoded_data = pd.get_dummies(selected_features, columns=['Category', 'City'], drop_first=True)
-
-# Define features (X) and target (y)
-X = encoded_data.drop(columns=['Place_Name', 'Description'])  # Drop Place_Name and Description as they are non-numerical
-y = df['Category']  # Predicting the category of the place
-
-# Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Initialize and train the Decision Tree model
-model = DecisionTreeClassifier(random_state=42)
-model.fit(X_train, y_train)
-
-# Preprocess text for description similarity
-def preprocess_text(text):
-    """Preprocess text by tokenizing, lowercasing, and removing common stopwords."""
-    from nltk.corpus import stopwords
-    from nltk.stem import PorterStemmer
-
-    stop_words = set(stopwords.words('indonesian'))  # Stopwords for Indonesian
-    stemmer = PorterStemmer()
-
-    tokens = text.lower().split()
-    tokens = [stemmer.stem(word) for word in tokens if word not in stop_words]
-    return set(tokens)
-
-# Flask app setup
 app = Flask(__name__)
+
+# Load preprocessed data
+data_file = "E:/DATA/PythonProgram/SR/destinasi-wisata-indonesia-preprocessed.xlsx"
+data = pd.read_excel(data_file)
+
+# Initialize TfidfVectorizer
+vectorizer = TfidfVectorizer()
 
 @app.route('/')
 def home():
-    cities = df['City'].unique()
-    categories = df['Category'].unique()
+    cities = data['City'].unique() if 'City' in data.columns else []
+    categories = data['Category'].unique() if 'Category' in data.columns else []
     return render_template('index.html', cities=cities, categories=categories)
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
-    user_input = request.form
-    city = user_input.get('city')
-    category = user_input.get('category')
-    max_price = float(user_input.get('price'))
-    description = user_input.get('description', "")
+    city = request.form.get('city')
+    max_price = float(request.form.get('price', 0))
+    description = request.form.get('description', '')
 
-    # Filter the data based on user input
-    filtered_df = df[(df['City'] == city) & (df['Category'] == category) & (df['Price'] <= max_price)]
+    # Filter based on city and price
+    filtered_data = data[
+        (data['City'] == city) &
+        (data['Price'] <= max_price)
+    ]
 
-    if filtered_df.empty:
-        return render_template('result.html', recommendations=None)
+    # Preprocess user description
+    processed_description = preprocess_text(description)
 
-    # Compute description similarity using Jaccard Similarity
-    user_desc_set = preprocess_text(description)
+    if 'Processed_Description' in filtered_data.columns:
+        # Text Similarity
+        tfidf_matrix = vectorizer.fit_transform(
+            [processed_description] + filtered_data['Processed_Description'].tolist()
+        )
+        text_similarities = 1 / (1 + euclidean_distances(tfidf_matrix[0:1], tfidf_matrix[1:]).flatten())
+        
+        # Price Similarity (normalized)
+        max_price_in_data = filtered_data['Price'].max()
+        filtered_data['Price_Similarity'] = 1 - (filtered_data['Price'] / max_price_in_data)
 
-    def calculate_combined_similarity(row):
-        row_desc_set = preprocess_text(row['Description'])
-        desc_similarity = len(user_desc_set & row_desc_set) / len(user_desc_set | row_desc_set) if len(user_desc_set | row_desc_set) != 0 else 0
-        category_similarity = 1 if row['Category'] == category else 0
-        return 0.8 * desc_similarity + 0.2 * category_similarity
+        # Final Score Calculation
+        w1, w2, w3, w4 = 0.4, 0.3, 0, 0.3  # Weights for Text, Price, Geo, and Rating
 
-    filtered_df['Similarity'] = filtered_df.apply(calculate_combined_similarity, axis=1)
+        # Ensure Rating exists and normalize if applicable
+        if 'Rating' in filtered_data.columns:
+            max_rating = filtered_data['Rating'].max()
+            filtered_data['Normalized_Rating'] = filtered_data['Rating'] / max_rating
+        else:
+            filtered_data['Normalized_Rating'] = 0
 
-    # Compute final score by combining similarity, rating, and price
-    filtered_df['Final_Score'] = (
-        0.7 * filtered_df['Similarity'] + 
-        0.2 * (filtered_df['Rating'] / 5) + 
-        0.1 * (1 - filtered_df['Price'] / filtered_df['Price'].max())
-    )
+        # Compute final score
+        filtered_data = filtered_data.copy()
+        filtered_data['Description_Similarity'] = text_similarities
+        filtered_data['Final_Score'] = (
+            w1 * filtered_data['Description_Similarity'] +
+            w2 * filtered_data['Price_Similarity'] +
+            w4 * filtered_data['Normalized_Rating']
+        )
 
-    # Sort recommendations by Final_Score
-    sorted_df = filtered_df.sort_values(by='Final_Score', ascending=False)
-    recommendations = sorted_df[['Place_Name', 'Price', 'Rating', 'Similarity', 'Final_Score']].to_dict(orient='records')
+        # Sort by Final Score
+        recommendations = filtered_data.sort_values(by=['Final_Score'], ascending=False)
+    else:
+        recommendations = pd.DataFrame()  # Empty recommendations
 
-    return render_template('result.html', recommendations=recommendations)
+    # If no recommendations found, show a message
+    if recommendations.empty:
+        message = "No recommendations found."
+    else:
+        message = None
+
+    return render_template('result.html', recommendations=recommendations.to_dict('records'), message=message)
+
+def preprocess_text(text):
+    """Preprocess input text for comparison."""
+    text = text.lower()
+    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
+    text = re.sub(r'\s+', ' ', text).strip()  # Remove extra spaces
+    return text
 
 if __name__ == '__main__':
     app.run(debug=True)
