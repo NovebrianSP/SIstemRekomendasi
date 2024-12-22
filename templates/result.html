@@ -39,25 +39,19 @@
               <td>{{ recommendation.Category }}</td>
               <td>Rp {{ recommendation.Price | int }}</td>
               <td>
-                {% if recommendation.Description_Similarity is not none %}
-                  {{ recommendation.Description_Similarity | round(2) }}
-                {% else %}
-                  N/A
-                {% endif %}
+                {% if recommendation.Description_Similarity is not none %} {{
+                recommendation.Description_Similarity | round(2) }} {% else %}
+                N/A {% endif %}
               </td>
               <td>
-                {% if recommendation.Price_Similarity is not none %}
-                  {{ recommendation.Price_Similarity | round(2) }}
-                {% else %}
-                  N/A
-                {% endif %}
+                {% if recommendation.Price_Similarity is not none %} {{
+                recommendation.Price_Similarity | round(2) }} {% else %} N/A {%
+                endif %}
               </td>
               <td>
-                {% if recommendation.Normalized_Rating is not none %}
-                  {{ recommendation.Normalized_Rating | round(2) }}
-                {% else %}
-                  N/A
-                {% endif %}
+                {% if recommendation.Normalized_Rating is not none %} {{
+                recommendation.Normalized_Rating | round(2) }} {% else %} N/A {%
+                endif %}
               </td>
               <td>{{ recommendation.Final_Score | round(2) }}</td>
             </tr>
